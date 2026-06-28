@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { View, StatusBar, StyleSheet } from "react-native";
 import * as ScreenOrientation from "expo-screen-orientation";
+import * as Updates from "expo-updates";
 import { setToken } from "./src/api";
 import { loadAuth, clearAuth } from "./src/storage";
 import { LoginScreen } from "./src/screens/LoginScreen";
@@ -16,6 +17,17 @@ type Stage =
 
 export default function App() {
   const [stage, setStage] = useState<Stage>({ name: "loading" });
+
+  // Check for OTA update on launch and reload immediately if one is available.
+  useEffect(() => {
+    if (!Updates.isEmbeddedLaunch) return; // skip in dev/Expo Go
+    Updates.checkForUpdateAsync()
+      .then(({ isAvailable }) => {
+        if (!isAvailable) return;
+        return Updates.fetchUpdateAsync().then(() => Updates.reloadAsync());
+      })
+      .catch(() => {}); // never block the app if update check fails
+  }, []);
 
   // Lock landscape — TVs are landscape and ads are authored for it.
   useEffect(() => {
