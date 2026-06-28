@@ -10,7 +10,7 @@ import {
   endSession,
   reportLocation,
 } from "../api";
-import { saveCounts, loadCounts } from "../storage";
+import { saveCounts, loadCounts, saveSlots, loadSlots } from "../storage";
 import {
   SLOT_DURATION,
   TOTAL_SLOTS,
@@ -55,12 +55,23 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
     });
   }, [screen.id]);
 
+  // ── Seed slots from cache so playback works immediately if offline ────────
+  useEffect(() => {
+    loadSlots(screen.id).then((cached) => {
+      if (cached && cached.length > 0 && slotsRef.current.length === 0) {
+        slotsRef.current = cached as Slot[];
+        setSlots(cached as Slot[]);
+      }
+    });
+  }, [screen.id]);
+
   // ── Fetch + poll slots ──────────────────────────────────────────────────
   const refreshSlots = useCallback(async () => {
     try {
       const data = await getSlots(screen.id);
       slotsRef.current = data;
       setSlots(data);
+      saveSlots(screen.id, data); // persist for offline fallback
     } catch {
       // keep last-known slots on a network hiccup so playback continues
     }

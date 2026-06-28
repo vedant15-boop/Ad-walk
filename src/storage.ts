@@ -27,6 +27,28 @@ export async function clearAuth(): Promise<void> {
   await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
 }
 
+// ── Last-known slots (fallback when app restarts offline) ───────────────────
+function slotsKey(screenId: number) {
+  return `adplay_slots_${screenId}`;
+}
+
+export async function saveSlots(screenId: number, slots: unknown[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(slotsKey(screenId), JSON.stringify(slots));
+  } catch {
+    // best-effort
+  }
+}
+
+export async function loadSlots(screenId: number): Promise<unknown[] | null> {
+  try {
+    const raw = await AsyncStorage.getItem(slotsKey(screenId));
+    return raw ? (JSON.parse(raw) as unknown[]) : null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Per-screen daily play counts (display only; server is source of truth) ──
 function countsKey(screenId: number, dateKey: string) {
   return `adplay_counts_${screenId}_${dateKey}`;
