@@ -57,6 +57,13 @@ export async function getSlots(screenId: number): Promise<Slot[]> {
   return request(`/slots?screenId=${screenId}`);
 }
 
+// Mirrors the web player's "Sync" button: marks the screen as recently
+// synced (visible on the admin dashboard) and confirms it's reachable.
+// The caller should follow this with getSlots() to pull the full playlist.
+export async function syncScreen(screenId: number): Promise<void> {
+  await request(`/screens/${screenId}/sync`, { method: "POST" });
+}
+
 // ── Play logging ──────────────────────────────────────────────────────────
 export async function recordPlay(payload: {
   screenId: number;
@@ -66,6 +73,17 @@ export async function recordPlay(payload: {
   durationSeconds: number;
 }): Promise<void> {
   await request("/play-logs", { method: "POST", body: JSON.stringify(payload) });
+}
+
+// Flushes a backlog of plays queued while offline in a single request.
+export async function recordPlaysBatch(plays: Array<{
+  screenId: number;
+  adId: number;
+  slotNumber: number;
+  playedAt: string;
+  durationSeconds: number;
+}>): Promise<{ inserted: number }> {
+  return request("/play-logs/batch", { method: "POST", body: JSON.stringify({ plays }) });
 }
 
 // ── Single-session enforcement (mirrors the web player) ────────────────────

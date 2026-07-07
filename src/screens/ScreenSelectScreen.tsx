@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from "react-native";
 import { getMyScreens } from "../api";
+import { saveScreens, loadScreens } from "../storage";
 import { FocusButton } from "../components/FocusButton";
 import type { AuthUser, Screen } from "../types";
 
@@ -15,14 +16,24 @@ export function ScreenSelectScreen({
 }) {
   const [screens, setScreens] = useState<Screen[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
 
   const load = async () => {
     setError(null);
     setScreens(null);
+    setIsOffline(false);
     try {
-      setScreens(await getMyScreens(user.id));
+      const fresh = await getMyScreens(user.id);
+      setScreens(fresh);
+      saveScreens(fresh);
     } catch (e: any) {
-      setError(e?.message || "Could not load screens");
+      const cached = await loadScreens();
+      if (cached && cached.length > 0) {
+        setScreens(cached);
+        setIsOffline(true);
+      } else {
+        setError(e?.message || "Could not load screens");
+      }
     }
   };
 
@@ -34,6 +45,9 @@ export function ScreenSelectScreen({
     <View style={styles.root}>
       <Text style={styles.title}>Select Screen</Text>
       <Text style={styles.greeting}>Signed in as {user.name}</Text>
+      {isOffline && (
+        <Text style={styles.offlineNotice}>Offline — showing last-known screens</Text>
+      )}
 
       {screens === null && !error && (
         <View style={styles.center}>
@@ -80,7 +94,8 @@ export function ScreenSelectScreen({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0a0a0a", padding: 40 },
   title: { color: "#fff", fontSize: 34, fontWeight: "900" },
-  greeting: { color: "#888", fontSize: 15, marginTop: 4, marginBottom: 28 },
+  greeting: { color: "#888", fontSize: 15, marginTop: 4, marginBottom: 4 },
+  offlineNotice: { color: "#f97316", fontSize: 12, fontWeight: "700", marginBottom: 24 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16 },
   list: { gap: 16, paddingBottom: 20 },
   screenBtn: { width: "100%", alignItems: "flex-start" },

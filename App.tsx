@@ -3,7 +3,7 @@ import { View, StatusBar, StyleSheet } from "react-native";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as Updates from "expo-updates";
 import { setToken } from "./src/api";
-import { loadAuth, clearAuth } from "./src/storage";
+import { loadAuth, clearAuth, loadLastScreen, saveLastScreen, clearLastScreen } from "./src/storage";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { ScreenSelectScreen } from "./src/screens/ScreenSelectScreen";
 import { PlayerScreen } from "./src/screens/PlayerScreen";
@@ -34,20 +34,29 @@ export default function App() {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(() => {});
   }, []);
 
-  // Resume a saved session on launch (survives power cuts).
+  // Resume a saved session on launch (survives power cuts). If a screen was
+  // actively broadcasting before, skip straight into the player with it —
+  // no network call needed, so a cold boot with zero internet still starts
+  // playing ads immediately from whatever was last cached.
   useEffect(() => {
-    loadAuth().then((auth) => {
-      if (auth && auth.user.role === "runner") {
-        setToken(auth.token);
-        setStage({ name: "select", user: auth.user });
-      } else {
+    loadAuth().then(async (auth) => {
+      if (!auth || auth.user.role !== "runner") {
         setStage({ name: "login" });
+        return;
+      }
+      setToken(auth.token);
+      const lastScreen = await loadLastScreen();
+      if (lastScreen) {
+        setStage({ name: "player", user: auth.user, screen: lastScreen });
+      } else {
+        setStage({ name: "select", user: auth.user });
       }
     });
   }, []);
 
   const logout = async () => {
     await clearAuth();
+    await clearLastScreen();
     setToken(null);
     setStage({ name: "login" });
   };
@@ -62,14 +71,20 @@ export default function App() {
       {stage.name === "select" && (
         <ScreenSelectScreen
           user={stage.user}
-          onSelect={(screen) => setStage({ name: "player", user: stage.user, screen })}
+          onSelect={(screen) => {
+            saveLastScreen(screen);
+            setStage({ name: "player", user: stage.user, screen });
+          }}
           onLogout={logout}
         />
       )}
       {stage.name === "player" && (
         <PlayerScreen
           screen={stage.screen}
-          onExit={() => setStage({ name: "select", user: stage.user })}
+          onExit={() => {
+            clearLastScreen();
+            setStage({ name: "select", user: stage.user });
+          }}
         />
       )}
     </View>
