@@ -28,4 +28,7 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - run: eas update --branch preview --message "${{ github.event.head_commit.message }}" --non-interactive
+      - name: Publish update
+        run: eas update --branch preview --message "$COMMIT_MESSAGE" --non-interactive
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
