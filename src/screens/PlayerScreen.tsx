@@ -213,6 +213,16 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
         </View>
       )}
 
+      {/* Status strip — floats directly over the ad, no background box */}
+      <View style={styles.statusBar} pointerEvents="none">
+        <Text style={styles.statusText} numberOfLines={1}>
+          {screen.name} · {screen.serialNumber}
+        </Text>
+        <Text style={styles.statusText}>
+          Slot {currentSlotNum}/{TOTAL_SLOTS} · {hasAd ? "LIVE" : "FILLER"} · {todayCount} today
+          {coords ? `  ·  ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}` : ""}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -226,4 +236,16 @@ const styles = StyleSheet.create({
   kickedTitle: { color: "#fff", fontSize: 32, fontWeight: "900" },
   kickedBody: { color: "rgba(255,255,255,0.85)", fontSize: 16, textAlign: "center", maxWidth: 420 },
   kickedBtn: { marginTop: 12, width: 240 },
+  statusBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  statusText: { color: "rgba(255,255,255,0.6)", fontSize: 11, fontFamily: "monospace" },
 });
