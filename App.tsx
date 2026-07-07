@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, StatusBar, StyleSheet } from "react-native";
+import { View, Text, StatusBar, StyleSheet } from "react-native";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as Updates from "expo-updates";
 import { setToken } from "./src/api";
@@ -14,6 +14,18 @@ type Stage =
   | { name: "login" }
   | { name: "select"; user: AuthUser }
   | { name: "player"; user: AuthUser; screen: Screen };
+
+// What's actually running on this device right now — lets anyone confirm
+// whether an OTA update has landed just by looking at the screen, instead
+// of guessing. "Embedded" means still on the original APK bundle, no OTA
+// applied yet; otherwise shows when the currently-running update was
+// published.
+function buildStamp(): string {
+  if (Updates.isEmbeddedLaunch || !Updates.createdAt) return "build: embedded (no OTA yet)";
+  const d = Updates.createdAt;
+  const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `build: ${stamp}`;
+}
 
 export default function App() {
   const [stage, setStage] = useState<Stage>({ name: "loading" });
@@ -87,10 +99,21 @@ export default function App() {
           }}
         />
       )}
+
+      {/* Always-visible build stamp — confirms what's actually running */}
+      <Text style={styles.buildStamp} pointerEvents="none">{buildStamp()}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000" },
+  buildStamp: {
+    position: "absolute",
+    top: 4,
+    left: 8,
+    color: "rgba(255,255,255,0.35)",
+    fontSize: 9,
+    fontFamily: "monospace",
+  },
 });
