@@ -292,9 +292,10 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
       <View style={styles.syncArea}>
         <FocusButton
           label={isSyncing ? "Syncing…" : "Sync"}
-          variant="ghost"
+          variant="primary"
           onPress={handleSync}
           disabled={isSyncing}
+          preferred
           style={styles.syncBtn}
         />
         {syncMessage && (
