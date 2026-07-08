@@ -2,7 +2,7 @@
   "expo": {
     "name": "AdWalk Runner",
     "slug": "adwalk-runner-tv",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "landscape",
     "updates": {
       "url": "https://u.expo.dev/9d7e7c2c-44b7-4f0e-8bc6-83a824000048",
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.vikalp.adwalkrunner",
-      "versionCode": 1,
+      "versionCode": 2,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
