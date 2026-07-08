@@ -22,6 +22,7 @@ import {
 } from "../config";
 import { AdMedia } from "../components/AdMedia";
 import { FocusButton } from "../components/FocusButton";
+import { CustomerQrPanel } from "../components/CustomerQrPanel";
 import type { Screen, Slot } from "../types";
 
 function dateKey() {
@@ -38,6 +39,7 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [sessionTotal, setSessionTotal] = useState(0);
   const [todayCount, setTodayCount] = useState(0);
+  const [progressPercent, setProgressPercent] = useState(0);
 
   // Refs so the single playback loop always reads fresh values.
   const slotsRef = useRef<Slot[]>([]);
@@ -151,6 +153,7 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
 
     const tick = setInterval(() => {
       const elapsed = (Date.now() - startRef.t) / 1000;
+      setProgressPercent(Math.min(100, (elapsed / SLOT_DURATION) * 100));
       if (elapsed < SLOT_DURATION) return;
 
       const playing = slotsRef.current.find((s) => s.slotNumber === currentSlotRef.current) ?? null;
@@ -190,6 +193,7 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
       currentSlotRef.current = nextSlot;
       setCurrentSlotNum(nextSlot);
       startRef.t = Date.now();
+      setProgressPercent(0);
     }, 250);
 
     return () => clearInterval(tick);
@@ -267,15 +271,32 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
 
   return (
     <View style={styles.root}>
-      {/* Ad / filler — fills the whole panel, fit to any resolution */}
-      {hasAd ? (
-        <AdMedia url={currentSlot!.adMediaUrl} mediaType={currentSlot!.adMediaType} />
-      ) : (
-        <View style={styles.filler}>
-          <Text style={styles.fillerBrand}>AdWalk</Text>
-          <Text style={styles.fillerSub}>MOVING ADVERTISING NETWORK</Text>
-        </View>
-      )}
+      {/* Ad / filler — fills the available panel above the progress strip, fit to any resolution */}
+      <View style={styles.adArea}>
+        {hasAd ? (
+          <AdMedia url={currentSlot!.adMediaUrl} mediaType={currentSlot!.adMediaType} />
+        ) : (
+          <View style={styles.filler}>
+            <Text style={styles.fillerBrand}>AdWalk</Text>
+            <Text style={styles.fillerSub}>MOVING ADVERTISING NETWORK</Text>
+          </View>
+        )}
+
+        {hasAd && currentSlot!.customerId != null && (
+          <CustomerQrPanel
+            customerId={currentSlot!.customerId}
+            businessName={currentSlot!.customerBusinessName}
+            city={currentSlot!.customerCity}
+            state={currentSlot!.customerState}
+            coords={coords}
+          />
+        )}
+      </View>
+
+      {/* Slot progress — reserved strip, never overlaps the ad above it */}
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+      </View>
 
       {/* Status strip — floats directly over the ad, no background box */}
       <View style={styles.statusBar} pointerEvents="none">
@@ -306,20 +327,32 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
   );
 }
 
+const PROGRESS_BAR_HEIGHT = 4;
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000" },
-  filler: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center", backgroundColor: "#f97316" },
+  adArea: { flex: 1 },
+  filler: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f97316" },
   fillerBrand: { color: "#000", fontSize: 80, fontWeight: "900", letterSpacing: -2 },
   fillerSub: { color: "rgba(0,0,0,0.5)", fontSize: 14, letterSpacing: 6, marginTop: 8, fontWeight: "700" },
   kicked: { flex: 1, backgroundColor: "#dc2626", alignItems: "center", justifyContent: "center", padding: 40, gap: 16 },
   kickedTitle: { color: "#fff", fontSize: 32, fontWeight: "900" },
   kickedBody: { color: "rgba(255,255,255,0.85)", fontSize: 16, textAlign: "center", maxWidth: 420 },
   kickedBtn: { marginTop: 12, width: 240 },
+  progressTrack: {
+    height: PROGRESS_BAR_HEIGHT,
+    width: "100%",
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "rgba(255,255,255,0.5)",
+  },
   statusBar: {
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: PROGRESS_BAR_HEIGHT,
     paddingHorizontal: 16,
     paddingVertical: 6,
     flexDirection: "row",
