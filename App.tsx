@@ -31,8 +31,10 @@ export default function App() {
   const [stage, setStage] = useState<Stage>({ name: "loading" });
 
   // Check for OTA update on launch and reload immediately if one is available.
+  // isEnabled is false in dev/Expo Go — unlike isEmbeddedLaunch, it doesn't
+  // flip permanently false the first time a device ever applies an update.
   useEffect(() => {
-    if (!Updates.isEmbeddedLaunch) return; // skip in dev/Expo Go
+    if (!Updates.isEnabled) return;
     Updates.checkForUpdateAsync()
       .then(({ isAvailable }) => {
         if (!isAvailable) return;
