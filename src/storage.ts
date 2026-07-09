@@ -69,36 +69,6 @@ export async function loadScreens(): Promise<Screen[] | null> {
   }
 }
 
-// ── Last actively-broadcasting screen (so a reboot resumes straight into the
-// player, without needing screen-select's network call, if one was already
-// running) ───────────────────────────────────────────────────────────────
-const LAST_SCREEN_KEY = "adwalk_last_screen";
-
-export async function saveLastScreen(screen: Screen): Promise<void> {
-  try {
-    await AsyncStorage.setItem(LAST_SCREEN_KEY, JSON.stringify(screen));
-  } catch {
-    // best-effort
-  }
-}
-
-export async function loadLastScreen(): Promise<Screen | null> {
-  try {
-    const raw = await AsyncStorage.getItem(LAST_SCREEN_KEY);
-    return raw ? (JSON.parse(raw) as Screen) : null;
-  } catch {
-    return null;
-  }
-}
-
-export async function clearLastScreen(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(LAST_SCREEN_KEY);
-  } catch {
-    // best-effort
-  }
-}
-
 // ── Queued plays that failed to reach the server (offline) ──────────────────
 // Appended to instead of dropped whenever a live recordPlay call fails.
 // Cleared only after the server confirms receipt via the batch endpoint —

@@ -5,14 +5,12 @@ import * as Location from "expo-location";
 import {
   getSlots,
   recordPlay,
-  recordPlaysBatch,
-  syncScreen,
   startSession,
   heartbeat,
   endSession,
   reportLocation,
 } from "../api";
-import { saveCounts, loadCounts, saveSlots, loadSlots, queuePlay, loadQueuedPlays, removeOldestQueuedPlays } from "../storage";
+import { saveCounts, loadCounts, saveSlots, loadSlots, queuePlay } from "../storage";
 import {
   SLOT_DURATION,
   TOTAL_SLOTS,
@@ -208,55 +206,6 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
     return () => sub.remove();
   }, [onExit]);
 
-  // ── Manual sync: flush queued offline plays + pull fresh ad assignments ──
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
-
-  const handleSync = useCallback(async () => {
-    if (isSyncing) return;
-    setIsSyncing(true);
-    setSyncMessage(null);
-
-    let sentCount = 0;
-    let playsFailed = false;
-    try {
-      const queued = await loadQueuedPlays();
-      if (queued.length > 0) {
-        const { inserted } = await recordPlaysBatch(queued);
-        await removeOldestQueuedPlays(queued.length);
-        sentCount = inserted;
-      }
-    } catch {
-      playsFailed = true;
-    }
-
-    let refreshedCount = 0;
-    let refreshFailed = false;
-    try {
-      await syncScreen(screen.id);
-      const freshSlots = await getSlots(screen.id);
-      slotsRef.current = freshSlots;
-      setSlots(freshSlots);
-      saveSlots(screen.id, freshSlots);
-      refreshedCount = freshSlots.length;
-    } catch {
-      refreshFailed = true;
-    }
-
-    if (playsFailed && refreshFailed) {
-      setSyncMessage("Sync failed — check internet");
-    } else if (playsFailed) {
-      setSyncMessage(`Ads refreshed (${refreshedCount}) — sending queued plays failed`);
-    } else if (refreshFailed) {
-      setSyncMessage(`${sentCount} play${sentCount === 1 ? "" : "s"} sent — ad refresh failed`);
-    } else {
-      setSyncMessage(`Synced — ${sentCount} play${sentCount === 1 ? "" : "s"} sent, ${refreshedCount} ad${refreshedCount === 1 ? "" : "s"} refreshed`);
-    }
-
-    setIsSyncing(false);
-    setTimeout(() => setSyncMessage(null), 6000);
-  }, [screen.id, isSyncing]);
-
   if (kicked) {
     return (
       <View style={styles.kicked}>
@@ -308,21 +257,6 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
           {coords ? `  ·  ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}` : ""}
         </Text>
       </View>
-
-      {/* Manual sync — flushes queued offline plays + pulls fresh ads */}
-      <View style={styles.syncArea}>
-        <FocusButton
-          label={isSyncing ? "Syncing…" : "Sync"}
-          variant="primary"
-          onPress={handleSync}
-          disabled={isSyncing}
-          preferred
-          style={styles.syncBtn}
-        />
-        {syncMessage && (
-          <Text style={styles.syncMessage} numberOfLines={2}>{syncMessage}</Text>
-        )}
-      </View>
     </View>
   );
 }
@@ -360,27 +294,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   statusText: { color: "rgba(255,255,255,0.6)", fontSize: 11, fontFamily: "monospace" },
-  syncArea: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    alignItems: "flex-end",
-    gap: 6,
-  },
-  syncBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    minWidth: 0,
-  },
-  syncMessage: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 11,
-    fontFamily: "monospace",
-    textAlign: "right",
-    maxWidth: 220,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
 });
