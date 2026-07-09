@@ -304,7 +304,7 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
           {screen.name} · {screen.serialNumber}
         </Text>
         <Text style={styles.statusText}>
-          Slot {currentSlotNum}/{TOTAL_SLOTS} · {hasAd ? "LIVE" : "FILLER"} · {todayCount} today
+          Slot {currentSlotNum}/{TOTAL_SLOTS} · {hasAd ? "LIVE" : "FILLER"} · {sessionTotal} this session · {todayCount} today
           {coords ? `  ·  ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}` : ""}
         </Text>
       </View>
