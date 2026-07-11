@@ -234,9 +234,6 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
         {hasAd && currentSlot!.customerId != null && (
           <CustomerQrPanel
             customerId={currentSlot!.customerId}
-            businessName={currentSlot!.customerBusinessName}
-            city={currentSlot!.customerCity}
-            state={currentSlot!.customerState}
             coords={coords}
           />
         )}
