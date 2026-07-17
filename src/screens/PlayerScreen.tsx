@@ -17,6 +17,7 @@ import {
   HEARTBEAT_MS,
   SLOTS_REFRESH_MS,
   LOCATION_REPORT_MS,
+  SHOW_QR_PANEL,
 } from "../config";
 import { AdMedia } from "../components/AdMedia";
 import { FocusButton } from "../components/FocusButton";
@@ -231,7 +232,7 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
           </View>
         )}
 
-        {hasAd && currentSlot!.customerId != null && (
+        {SHOW_QR_PANEL && hasAd && currentSlot!.customerId != null && (
           <CustomerQrPanel
             customerId={currentSlot!.customerId}
             coords={coords}

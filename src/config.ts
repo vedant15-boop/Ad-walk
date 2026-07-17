@@ -16,6 +16,10 @@ export const HEARTBEAT_MS = 30_000; // session keep-alive
 export const SLOTS_REFRESH_MS = 30_000; // re-fetch slots to pick up newly approved ads
 export const LOCATION_REPORT_MS = 30 * 60_000; // push GPS to server every 30 min
 
+// Public customer-profile pages the QR links to aren't configured yet —
+// hide the panel until they're ready. Flip back to true to restore it.
+export const SHOW_QR_PANEL = false;
+
 /**
  * Media URLs from the API are stored relative (e.g. "/objects/uploads/abc").
  * Absolutise them against BASE_URL so the TV can load them.
