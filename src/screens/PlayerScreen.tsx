@@ -21,9 +21,7 @@ import {
   DEMO_JUMP_ALLOWLIST_IDS,
   DEMO_FAST_SLOT_SECONDS,
   DEMO_FAST_SLOT_ALLOWLIST_IDS,
-  mediaUri,
 } from "../config";
-import { prefetchAll, pruneCacheExcept } from "../mediaCache";
 import { AdMedia } from "../components/AdMedia";
 import { FocusButton } from "../components/FocusButton";
 import { CustomerQrPanel } from "../components/CustomerQrPanel";
@@ -87,12 +85,6 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
       slotsRef.current = data;
       setSlots(data);
       saveSlots(screen.id, data); // persist for offline fallback
-
-      // Cache this rotation's media to disk so playback survives going
-      // offline, and drop anything no longer in rotation.
-      const mediaUrls = data.map((s) => mediaUri(s.adMediaUrl)).filter((u): u is string => !!u);
-      prefetchAll(mediaUrls);
-      pruneCacheExcept(mediaUrls);
     } catch {
       // keep last-known slots on a network hiccup so playback continues
     }

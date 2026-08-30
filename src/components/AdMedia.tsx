@@ -1,9 +1,7 @@
-import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { mediaUri, isVideo } from "../config";
-import { getCachedUri, ensureCached } from "../mediaCache";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Resolution-independent ad renderer.
@@ -51,28 +49,14 @@ export function AdMedia({
   url: string | null;
   mediaType: string | null;
 }) {
-  const remoteUri = mediaUri(url);
-
-  // Play from disk if this exact media is already cached (survives being
-  // offline); otherwise play live and kick off a background download as a
-  // safety net for anything not yet caught by PlayerScreen's proactive
-  // prefetch (e.g. right after install, before the first refresh cycle).
-  const localUri = remoteUri ? getCachedUri(remoteUri) : null;
-  const playUri = localUri ?? remoteUri;
-
-  useEffect(() => {
-    if (remoteUri && !localUri) {
-      ensureCached(remoteUri);
-    }
-  }, [remoteUri, localUri]);
-
-  if (!playUri) return null;
+  const uri = mediaUri(url);
+  if (!uri) return null;
 
   // Keyed by uri so React fully remounts on slot change — gives a clean
   // fade for images and a fresh player instance for videos.
   return (
     <View style={StyleSheet.absoluteFill}>
-      {isVideo(mediaType, url) ? <AdVideo key={playUri} uri={playUri} /> : <AdImage key={playUri} uri={playUri} />}
+      {isVideo(mediaType, url) ? <AdVideo key={uri} uri={uri} /> : <AdImage key={uri} uri={uri} />}
     </View>
   );
 }
