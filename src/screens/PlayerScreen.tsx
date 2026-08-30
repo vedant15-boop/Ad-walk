@@ -18,19 +18,30 @@ import {
   SLOTS_REFRESH_MS,
   LOCATION_REPORT_MS,
   SHOW_QR_PANEL,
+  DEMO_JUMP_ALLOWLIST_IDS,
+  DEMO_FAST_SLOT_SECONDS,
+  DEMO_FAST_SLOT_ALLOWLIST_IDS,
+  mediaUri,
 } from "../config";
+import { prefetchAll, pruneCacheExcept } from "../mediaCache";
 import { AdMedia } from "../components/AdMedia";
 import { FocusButton } from "../components/FocusButton";
 import { CustomerQrPanel } from "../components/CustomerQrPanel";
-import type { Screen, Slot } from "../types";
+import { DemoSlotJumpControl } from "../components/DemoSlotJumpControl";
+import type { AuthUser, Screen, Slot } from "../types";
 
 function dateKey() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () => void }) {
+export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: AuthUser; onExit: () => void }) {
   useKeepAwake(); // never let the TV sleep while broadcasting
+
+  const canJumpSlots = DEMO_JUMP_ALLOWLIST_IDS.includes(user.id);
+  const effectiveSlotDuration = DEMO_FAST_SLOT_ALLOWLIST_IDS.includes(user.id)
+    ? DEMO_FAST_SLOT_SECONDS
+    : SLOT_DURATION;
 
   const [slots, setSlots] = useState<Slot[]>([]);
   const [currentSlotNum, setCurrentSlotNum] = useState(1);
@@ -46,6 +57,7 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
   const sessionTokenRef = useRef<string | null>(null);
   const countsRef = useRef<Map<number, number>>(new Map());
   const coordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  const slotStartRef = useRef(Date.now());
 
   const slotMap = new Map(slots.map((s) => [s.slotNumber, s]));
   const currentSlot = slotMap.get(currentSlotNum) ?? null;
@@ -75,6 +87,12 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
       slotsRef.current = data;
       setSlots(data);
       saveSlots(screen.id, data); // persist for offline fallback
+
+      // Cache this rotation's media to disk so playback survives going
+      // offline, and drop anything no longer in rotation.
+      const mediaUrls = data.map((s) => mediaUri(s.adMediaUrl)).filter((u): u is string => !!u);
+      prefetchAll(mediaUrls);
+      pruneCacheExcept(mediaUrls);
     } catch {
       // keep last-known slots on a network hiccup so playback continues
     }
@@ -148,12 +166,12 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
 
   // ── Playback loop: advance every SLOT_DURATION, log the ad that played ───
   useEffect(() => {
-    const startRef = { t: Date.now() };
+    slotStartRef.current = Date.now();
 
     const tick = setInterval(() => {
-      const elapsed = (Date.now() - startRef.t) / 1000;
-      setProgressPercent(Math.min(100, (elapsed / SLOT_DURATION) * 100));
-      if (elapsed < SLOT_DURATION) return;
+      const elapsed = (Date.now() - slotStartRef.current) / 1000;
+      setProgressPercent(Math.min(100, (elapsed / effectiveSlotDuration) * 100));
+      if (elapsed < effectiveSlotDuration) return;
 
       const playing = slotsRef.current.find((s) => s.slotNumber === currentSlotRef.current) ?? null;
       if (playing) {
@@ -168,13 +186,13 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
         setTodayCount(Array.from(next.values()).reduce((a, b) => a + b, 0));
         setSessionTotal((p) => p + 1);
 
-        const playedAt = new Date(startRef.t).toISOString();
+        const playedAt = new Date(slotStartRef.current).toISOString();
         recordPlay({
           screenId: screen.id,
           adId: playing.adId,
           slotNumber: playing.slotNumber,
           playedAt,
-          durationSeconds: SLOT_DURATION,
+          durationSeconds: effectiveSlotDuration,
         }).catch(() => {
           // Offline or request failed — queue it instead of losing it.
           // Flushed later via the manual Sync button.
@@ -183,7 +201,7 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
             adId: playing.adId,
             slotNumber: playing.slotNumber,
             playedAt,
-            durationSeconds: SLOT_DURATION,
+            durationSeconds: effectiveSlotDuration,
           });
         });
       }
@@ -191,12 +209,24 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
       const nextSlot = (currentSlotRef.current % TOTAL_SLOTS) + 1;
       currentSlotRef.current = nextSlot;
       setCurrentSlotNum(nextSlot);
-      startRef.t = Date.now();
+      slotStartRef.current = Date.now();
       setProgressPercent(0);
     }, 250);
 
     return () => clearInterval(tick);
   }, [screen.id]);
+
+  // ── Demo-only: jump straight to a slot (see DEMO_JUMP_ALLOWLIST_IDS) ────
+  // No play is logged for the slot jumped away from — it didn't complete
+  // its full dwell, so logging a normal-duration play for it would be a
+  // false billing record. The slot jumped into logs normally once the tick
+  // above naturally reaches SLOT_DURATION from the reset clock.
+  const jumpToSlot = useCallback((target: number) => {
+    currentSlotRef.current = target;
+    setCurrentSlotNum(target);
+    slotStartRef.current = Date.now();
+    setProgressPercent(0);
+  }, []);
 
   // ── Remote BACK button exits cleanly ────────────────────────────────────
   useEffect(() => {
@@ -237,6 +267,10 @@ export function PlayerScreen({ screen, onExit }: { screen: Screen; onExit: () =>
             customerId={currentSlot!.customerId}
             coords={coords}
           />
+        )}
+
+        {canJumpSlots && (
+          <DemoSlotJumpControl currentSlotNum={currentSlotNum} onJump={jumpToSlot} />
         )}
       </View>
 

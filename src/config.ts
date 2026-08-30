@@ -16,9 +16,24 @@ export const HEARTBEAT_MS = 30_000; // session keep-alive
 export const SLOTS_REFRESH_MS = 30_000; // re-fetch slots to pick up newly approved ads
 export const LOCATION_REPORT_MS = 30 * 60_000; // push GPS to server every 30 min
 
-// Public customer-profile pages the QR links to aren't configured yet —
-// hide the panel until they're ready. Flip back to true to restore it.
-export const SHOW_QR_PANEL = false;
+export const SHOW_QR_PANEL = true;
+
+/**
+ * Demo-only: AuthUser.id values allowed to manually jump PlayerScreen to
+ * any slot while broadcasting, instead of waiting the ~12s/slot rotation.
+ * Jumping changes what's shown/logged (recordPlay feeds advertiser
+ * billing), so this is an explicit allowlist of specific accounts, not a
+ * role check. Empty array = disabled for everyone.
+ */
+export const DEMO_JUMP_ALLOWLIST_IDS: number[] = [23, 45]; // runner1 (id 23), demo runner (id 45)
+
+/**
+ * Demo-only: AuthUser.id values that play each slot for
+ * DEMO_FAST_SLOT_SECONDS instead of the real SLOT_DURATION. Scoped to a
+ * dedicated demo runner account — never a real deployment.
+ */
+export const DEMO_FAST_SLOT_SECONDS = 4;
+export const DEMO_FAST_SLOT_ALLOWLIST_IDS: number[] = [45]; // demo runner
 
 /**
  * Media URLs from the API are stored relative (e.g. "/objects/uploads/abc").

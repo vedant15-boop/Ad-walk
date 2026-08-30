@@ -86,6 +86,7 @@ export default function App() {
       {stage.name === "player" && (
         <PlayerScreen
           screen={stage.screen}
+          user={stage.user}
           onExit={() => setStage({ name: "select", user: stage.user })}
         />
       )}
