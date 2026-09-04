@@ -257,6 +257,7 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
         {SHOW_QR_PANEL && hasAd && currentSlot!.customerId != null && (
           <CustomerQrPanel
             customerId={currentSlot!.customerId}
+            businessName={currentSlot!.customerBusinessName}
             coords={coords}
           />
         )}

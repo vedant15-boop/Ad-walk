@@ -25,7 +25,7 @@ export const SHOW_QR_PANEL = true;
  * billing), so this is an explicit allowlist of specific accounts, not a
  * role check. Empty array = disabled for everyone.
  */
-export const DEMO_JUMP_ALLOWLIST_IDS: number[] = [23, 45]; // runner1 (id 23), demo runner (id 45)
+export const DEMO_JUMP_ALLOWLIST_IDS: number[] = [45]; // demo runner only
 
 /**
  * Demo-only: AuthUser.id values that play each slot for

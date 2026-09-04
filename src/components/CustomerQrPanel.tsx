@@ -3,15 +3,16 @@ import QRCode from "react-native-qrcode-svg";
 import { BASE_URL } from "../config";
 
 // Floating QR code: lets a passerby scan to view the advertiser's public
-// profile. Business name/address are hidden for now (privacy, not decided
-// yet whether to surface them on-screen). Needs its own translucent
-// background (unlike the purely-informational status text elsewhere) since
-// the QR code itself needs a solid white patch to stay scannable.
+// profile. Needs its own translucent background (unlike the
+// purely-informational status text elsewhere) since the QR code itself
+// needs a solid white patch to stay scannable.
 export function CustomerQrPanel({
   customerId,
+  businessName,
   coords,
 }: {
   customerId: number;
+  businessName?: string | null;
   coords: { lat: number; lng: number } | null;
 }) {
   const profileUrl = `${BASE_URL}/api/qr/customer/${customerId}`;
@@ -22,6 +23,12 @@ export function CustomerQrPanel({
         <View style={styles.qrBox}>
           <QRCode value={profileUrl} size={64} backgroundColor="#fff" color="#000" />
         </View>
+
+        {businessName && (
+          <Text style={styles.name} numberOfLines={1}>
+            {businessName}
+          </Text>
+        )}
 
         {coords && (
           <Text style={styles.coords} numberOfLines={1}>
@@ -51,5 +58,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     padding: 4,
   },
+  name: { color: "#fff", fontSize: 9, fontWeight: "600", maxWidth: 90 },
   coords: { color: "#fdba74", fontSize: 7, fontFamily: "monospace" },
 });
