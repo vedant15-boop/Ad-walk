@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from "react-native";
 import { getMyScreens, recordPlaysBatch, syncScreen } from "../api";
-import { saveScreens, loadScreens, loadQueuedPlays, removeOldestQueuedPlays } from "../storage";
+import { saveScreens, loadScreens, flushQueuedPlays } from "../storage";
 import { FocusButton } from "../components/FocusButton";
 import type { AuthUser, Screen } from "../types";
 
@@ -55,12 +55,7 @@ export function ScreenSelectScreen({
     let sentCount = 0;
     let playsFailed = false;
     try {
-      const queued = await loadQueuedPlays();
-      if (queued.length > 0) {
-        const { inserted } = await recordPlaysBatch(queued);
-        await removeOldestQueuedPlays(queued.length);
-        sentCount = inserted;
-      }
+      sentCount = await flushQueuedPlays(recordPlaysBatch);
     } catch {
       playsFailed = true;
     }

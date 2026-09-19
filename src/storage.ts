@@ -83,12 +83,27 @@ export interface QueuedPlay {
 
 const PLAY_QUEUE_KEY = "adwalk_play_queue";
 
+/**
+ * Hard cap on the offline backlog. At ~7,200 plays/day an unbounded queue
+ * grows until AsyncStorage refuses the write, at which point every later play
+ * is lost silently. Dropping the oldest keeps the most recent (and most
+ * likely still billable) plays instead.
+ */
+export const MAX_QUEUED_PLAYS = 20000;
+
 export async function queuePlay(play: QueuedPlay): Promise<void> {
   try {
     const existing = await loadQueuedPlays();
-    await AsyncStorage.setItem(PLAY_QUEUE_KEY, JSON.stringify([...existing, play]));
-  } catch {
-    // best-effort — if this fails there's nothing more we can do locally
+    const next = [...existing, play];
+    const trimmed = next.length > MAX_QUEUED_PLAYS ? next.slice(next.length - MAX_QUEUED_PLAYS) : next;
+    if (trimmed.length < next.length) {
+      console.warn(`[adwalk] play queue full — dropped ${next.length - trimmed.length} oldest play(s)`);
+    }
+    await AsyncStorage.setItem(PLAY_QUEUE_KEY, JSON.stringify(trimmed));
+  } catch (err) {
+    // Losing a play here means losing revenue, so make it visible rather than
+    // failing silently the way this used to.
+    console.warn("[adwalk] failed to queue play for later sync", err);
   }
 }
 
@@ -111,6 +126,26 @@ export async function removeOldestQueuedPlays(count: number): Promise<void> {
   } catch {
     // best-effort
   }
+}
+
+/**
+ * Send queued plays to the server and drop the ones it accepted.
+ *
+ * Returns how many were flushed. Safe to call on a timer: a single in-flight
+ * guard is the caller's job, and anything queued while the request is in
+ * flight is newer than the slice being removed, so it stays behind.
+ */
+export async function flushQueuedPlays(
+  send: (plays: QueuedPlay[]) => Promise<{ inserted: number }>,
+  maxPerFlush = 2000,
+): Promise<number> {
+  const queued = await loadQueuedPlays();
+  if (queued.length === 0) return 0;
+
+  const batch = queued.slice(0, maxPerFlush);
+  await send(batch);
+  await removeOldestQueuedPlays(batch.length);
+  return batch.length;
 }
 
 // ── Per-screen daily play counts (display only; server is source of truth) ──

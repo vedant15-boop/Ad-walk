@@ -15,15 +15,30 @@ class ApiError extends Error {
   }
 }
 
+/**
+ * A TV on weak mobile data can otherwise leave a fetch hanging indefinitely,
+ * stacking up pending requests behind the 30s heartbeat and refresh timers.
+ */
+const REQUEST_TIMEOUT_MS = 20_000;
+
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...opts,
-    headers: {
-      "Content-Type": "application/json",
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      ...(opts.headers ?? {}),
-    },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...opts,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        ...(opts.headers ?? {}),
+      },
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!res.ok) {
     let msg = `Request failed (${res.status})`;
@@ -103,19 +118,6 @@ export async function heartbeat(screenId: number, sessionToken: string): Promise
 
 export async function endSession(): Promise<void> {
   await request("/runner-sessions", { method: "DELETE" });
-}
-
-// ── GPS reporting (best-effort) ────────────────────────────────────────────
-// Backend endpoint POST /api/runner/location is not implemented yet; this is
-// wrapped by the caller in try/catch so a 404 is harmless. When the endpoint
-// is added server-side, location reporting starts working with no app change.
-export async function reportLocation(payload: {
-  screenId: number;
-  lat: number;
-  lng: number;
-  recordedAt: string;
-}): Promise<void> {
-  await request("/runner/location", { method: "POST", body: JSON.stringify(payload) });
 }
 
 export { ApiError };

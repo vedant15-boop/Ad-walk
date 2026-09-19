@@ -5,19 +5,19 @@ import * as Location from "expo-location";
 import {
   getSlots,
   recordPlay,
+  recordPlaysBatch,
   startSession,
   heartbeat,
   endSession,
-  reportLocation,
 } from "../api";
-import { saveCounts, loadCounts, saveSlots, loadSlots, queuePlay } from "../storage";
+import { saveCounts, loadCounts, saveSlots, loadSlots, queuePlay, flushQueuedPlays } from "../storage";
 import {
   SLOT_DURATION,
   TOTAL_SLOTS,
   HEARTBEAT_MS,
   SLOTS_REFRESH_MS,
-  LOCATION_REPORT_MS,
   SHOW_QR_PANEL,
+  PLAY_QUEUE_FLUSH_MS,
   DEMO_JUMP_ALLOWLIST_IDS,
   DEMO_FAST_SLOT_SECONDS,
   DEMO_FAST_SLOT_ALLOWLIST_IDS,
@@ -124,7 +124,12 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
     };
   }, [screen.id]);
 
-  // ── GPS: watch position + periodic report ───────────────────────────────
+  // ── GPS: watch position for the on-screen readout ───────────────────────
+  //
+  // Coordinates are shown in the status strip and QR panel only. There is no
+  // server-side location endpoint, so nothing is reported upstream; the old
+  // periodic POST here targeted a route that never existed and silently 404'd
+  // on every call.
   useEffect(() => {
     let sub: Location.LocationSubscription | null = null;
     (async () => {
@@ -140,19 +145,8 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
       );
     })();
 
-    const report = setInterval(async () => {
-      const c = coordsRef.current;
-      if (!c) return;
-      try {
-        await reportLocation({ screenId: screen.id, lat: c.lat, lng: c.lng, recordedAt: new Date().toISOString() });
-      } catch {
-        // endpoint may not exist yet — harmless
-      }
-    }, LOCATION_REPORT_MS);
-
     return () => {
       sub?.remove();
-      clearInterval(report);
     };
   }, [screen.id]);
 
@@ -207,6 +201,28 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
 
     return () => clearInterval(tick);
   }, [screen.id]);
+
+  // ── Flush the offline play backlog while broadcasting ───────────────────
+  useEffect(() => {
+    let inFlight = false;
+
+    const flush = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const sent = await flushQueuedPlays(recordPlaysBatch);
+        if (sent > 0) console.log(`[adwalk] flushed ${sent} queued play(s)`);
+      } catch {
+        // Still offline — the queue keeps them for the next attempt.
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    flush();
+    const t = setInterval(flush, PLAY_QUEUE_FLUSH_MS);
+    return () => clearInterval(t);
+  }, []);
 
   // ── Demo-only: jump straight to a slot (see DEMO_JUMP_ALLOWLIST_IDS) ────
   // No play is logged for the slot jumped away from — it didn't complete
