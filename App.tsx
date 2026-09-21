@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Text, StatusBar, StyleSheet, useWindowDimensions } from "react-native";
+import { View, Text, StatusBar, StyleSheet } from "react-native";
 import * as Updates from "expo-updates";
 import { setToken } from "./src/api";
 import { loadAuth, clearAuth, loadOrientation, saveOrientation, type DisplayOrientation } from "./src/storage";
@@ -29,7 +29,6 @@ function buildStamp(): string {
 
 export default function App() {
   const [stage, setStage] = useState<Stage>({ name: "loading" });
-  const win = useWindowDimensions();
 
   // Check for OTA update on launch and reload immediately if one is available.
   // isEnabled is false in dev/Expo Go — unlike isEmbeddedLaunch, it doesn't
@@ -102,12 +101,8 @@ export default function App() {
           />
         )}
 
-        {/* Always-visible build stamp — confirms what's actually running,
-            plus the orientation state so a rotation problem can be diagnosed
-            off the screen itself rather than guessed at remotely. */}
-        <Text style={styles.buildStamp} pointerEvents="none">
-          {buildStamp()} · {orientation} · {Math.round(win.width)}x{Math.round(win.height)}
-        </Text>
+        {/* Always-visible build stamp — confirms what's actually running */}
+        <Text style={styles.buildStamp} pointerEvents="none">{buildStamp()}</Text>
       </View>
     </RotatedStage>
   );

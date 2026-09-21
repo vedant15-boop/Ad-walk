@@ -45,7 +45,8 @@ export function RotatedStage({
   }
 
   // Swap the axes: a portrait-shaped box, centred, then turned a quarter turn
-  // so it lands exactly over the landscape screen.
+  // clockwise so it lands exactly over the landscape screen the right way up
+  // for the direction the panel is carried.
   const portraitWidth = Math.min(width, height);
   const portraitHeight = Math.max(width, height);
 
@@ -58,7 +59,7 @@ export function RotatedStage({
           height: portraitHeight,
           left: (width - portraitWidth) / 2,
           top: (height - portraitHeight) / 2,
-          transform: [{ rotate: "-90deg" }],
+          transform: [{ rotate: "90deg" }],
         }}
       >
         {children}
