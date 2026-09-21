@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { View, Text, StatusBar, StyleSheet } from "react-native";
-import * as ScreenOrientation from "expo-screen-orientation";
 import * as Updates from "expo-updates";
 import { setToken } from "./src/api";
-import { loadAuth, clearAuth } from "./src/storage";
+import { loadAuth, clearAuth, loadOrientation, saveOrientation, type DisplayOrientation } from "./src/storage";
+import { RotatedStage } from "./src/components/RotatedStage";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { ScreenSelectScreen } from "./src/screens/ScreenSelectScreen";
 import { PlayerScreen } from "./src/screens/PlayerScreen";
@@ -43,10 +43,17 @@ export default function App() {
       .catch(() => {}); // never block the app if update check fails
   }, []);
 
-  // Lock landscape — TVs are landscape and ads are authored for it.
+  // How the panel is physically mounted. Persisted per device — the carrier
+  // sets it once after strapping the screen on.
+  const [orientation, setOrientation] = useState<DisplayOrientation>("landscape");
   useEffect(() => {
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(() => {});
+    loadOrientation().then(setOrientation);
   }, []);
+
+  const changeOrientation = (next: DisplayOrientation) => {
+    setOrientation(next);
+    saveOrientation(next);
+  };
 
   // Resume a saved login on launch (survives power cuts) — skips straight
   // past the login screen, but always lands on select so the runner picks
@@ -70,30 +77,34 @@ export default function App() {
   };
 
   return (
-    <View style={styles.root}>
-      <StatusBar hidden />
-      {stage.name === "loading" && <View style={styles.root} />}
-      {stage.name === "login" && (
-        <LoginScreen onSuccess={(user) => setStage({ name: "select", user })} />
-      )}
-      {stage.name === "select" && (
-        <ScreenSelectScreen
-          user={stage.user}
-          onSelect={(screen) => setStage({ name: "player", user: stage.user, screen })}
-          onLogout={logout}
-        />
-      )}
-      {stage.name === "player" && (
-        <PlayerScreen
-          screen={stage.screen}
-          user={stage.user}
-          onExit={() => setStage({ name: "select", user: stage.user })}
-        />
-      )}
+    <RotatedStage orientation={orientation}>
+      <View style={styles.root}>
+        <StatusBar hidden />
+        {stage.name === "loading" && <View style={styles.root} />}
+        {stage.name === "login" && (
+          <LoginScreen onSuccess={(user) => setStage({ name: "select", user })} />
+        )}
+        {stage.name === "select" && (
+          <ScreenSelectScreen
+            user={stage.user}
+            onSelect={(screen) => setStage({ name: "player", user: stage.user, screen })}
+            onLogout={logout}
+            orientation={orientation}
+            onChangeOrientation={changeOrientation}
+          />
+        )}
+        {stage.name === "player" && (
+          <PlayerScreen
+            screen={stage.screen}
+            user={stage.user}
+            onExit={() => setStage({ name: "select", user: stage.user })}
+          />
+        )}
 
-      {/* Always-visible build stamp — confirms what's actually running */}
-      <Text style={styles.buildStamp} pointerEvents="none">{buildStamp()}</Text>
-    </View>
+        {/* Always-visible build stamp — confirms what's actually running */}
+        <Text style={styles.buildStamp} pointerEvents="none">{buildStamp()}</Text>
+      </View>
+    </RotatedStage>
   );
 }
 

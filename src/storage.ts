@@ -27,6 +27,35 @@ export async function clearAuth(): Promise<void> {
   await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
 }
 
+// ── Display orientation ─────────────────────────────────────────────────────
+//
+// The panel is carried physically turned on its side, so the box still thinks
+// it's landscape and renders content lying down from a passer-by's point of
+// view. "portrait" counter-rotates to cancel that out.
+//
+// A device setting rather than a server one: only whoever straps the screen on
+// can see which way it ended up.
+export type DisplayOrientation = "landscape" | "portrait";
+
+const ORIENTATION_KEY = "adwalk_orientation";
+
+export async function loadOrientation(): Promise<DisplayOrientation> {
+  try {
+    const raw = await AsyncStorage.getItem(ORIENTATION_KEY);
+    return raw === "portrait" ? "portrait" : "landscape";
+  } catch {
+    return "landscape";
+  }
+}
+
+export async function saveOrientation(value: DisplayOrientation): Promise<void> {
+  try {
+    await AsyncStorage.setItem(ORIENTATION_KEY, value);
+  } catch {
+    // best-effort — the in-memory setting still applies for this session
+  }
+}
+
 // ── Last-known slots (fallback when app restarts offline) ───────────────────
 function slotsKey(screenId: number) {
   return `adplay_slots_${screenId}`;

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from "react-native";
 import { getMyScreens, recordPlaysBatch, syncScreen } from "../api";
-import { saveScreens, loadScreens, flushQueuedPlays } from "../storage";
+import { saveScreens, loadScreens, flushQueuedPlays, type DisplayOrientation } from "../storage";
 import { FocusButton } from "../components/FocusButton";
 import type { AuthUser, Screen } from "../types";
 
@@ -9,10 +9,14 @@ export function ScreenSelectScreen({
   user,
   onSelect,
   onLogout,
+  orientation,
+  onChangeOrientation,
 }: {
   user: AuthUser;
   onSelect: (screen: Screen) => void;
   onLogout: () => void;
+  orientation: DisplayOrientation;
+  onChangeOrientation: (next: DisplayOrientation) => void;
 }) {
   const [screens, setScreens] = useState<Screen[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +148,13 @@ export function ScreenSelectScreen({
       )}
 
       <View style={styles.footer}>
+        {/* Set this after strapping the screen on — if the picture reads
+            sideways to someone standing in front, switch it. */}
+        <FocusButton
+          label={orientation === "portrait" ? "Display: Portrait" : "Display: Landscape"}
+          variant="ghost"
+          onPress={() => onChangeOrientation(orientation === "portrait" ? "landscape" : "portrait")}
+        />
         <FocusButton label="Log out" variant="ghost" onPress={onLogout} />
       </View>
     </View>
@@ -165,5 +176,5 @@ const styles = StyleSheet.create({
   retry: { width: 200 },
   empty: { color: "#fff", fontSize: 20, fontWeight: "700" },
   emptySub: { color: "#888", fontSize: 14 },
-  footer: { marginTop: 16, alignItems: "center" },
+  footer: { marginTop: 16, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 16 },
 });
