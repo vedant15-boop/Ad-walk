@@ -29,38 +29,35 @@ export function RotatedStage({
 }) {
   const { width, height } = useWindowDimensions();
 
+  // Always keep the OS in landscape and do the rotation ourselves.
+  //
+  // Asking the box to rotate looked cleaner but wasn't reliable: at least one
+  // box changes the dimensions it reports without actually rotating what it
+  // renders, which made "did the window flip?" useless as a signal — it looked
+  // handled, so nothing rotated and the toggle appeared dead. Doing it
+  // ourselves is deterministic and behaves the same on every box.
   useEffect(() => {
-    const lock = orientation === "portrait"
-      // PORTRAIT_UP rather than PORTRAIT: the docs note plain PORTRAIT is
-      // invalid on devices that can't do PORTRAIT_DOWN, which includes a lot
-      // of TV hardware.
-      ? ScreenOrientation.OrientationLock.PORTRAIT_UP
-      : ScreenOrientation.OrientationLock.LANDSCAPE;
-    ScreenOrientation.lockAsync(lock).catch(() => {
-      // Box refuses to rotate — the transform below covers it.
-    });
-  }, [orientation]);
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(() => {});
+  }, []);
 
-  // The OS ignored us if we asked for portrait and the window is still wider
-  // than it is tall.
-  const mustRotateOurselves = orientation === "portrait" && width > height;
-
-  if (!mustRotateOurselves) {
+  if (orientation !== "portrait") {
     return <View style={styles.fill}>{children}</View>;
   }
+
+  // Swap the axes: a portrait-shaped box, centred, then turned a quarter turn
+  // so it lands exactly over the landscape screen.
+  const portraitWidth = Math.min(width, height);
+  const portraitHeight = Math.max(width, height);
 
   return (
     <View style={styles.fill}>
       <View
         style={{
           position: "absolute",
-          // Portrait-shaped box: the screen's dimensions swapped.
-          width: height,
-          height: width,
-          // Centre it, so rotating about its own centre lands it exactly over
-          // the screen.
-          left: (width - height) / 2,
-          top: (height - width) / 2,
+          width: portraitWidth,
+          height: portraitHeight,
+          left: (width - portraitWidth) / 2,
+          top: (height - portraitHeight) / 2,
           transform: [{ rotate: "-90deg" }],
         }}
       >
@@ -71,5 +68,7 @@ export function RotatedStage({
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1, backgroundColor: "#000" },
+  // overflow visible matters: before the rotation is applied the child is
+  // taller than the screen, and a clipping parent would cut it off.
+  fill: { flex: 1, backgroundColor: "#000", overflow: "visible" },
 });
