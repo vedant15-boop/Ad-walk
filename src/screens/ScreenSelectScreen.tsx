@@ -129,7 +129,7 @@ export function ScreenSelectScreen({
       {screens && screens.length === 0 && (
         <View style={styles.center}>
           <Text style={styles.empty}>No screens assigned to you.</Text>
-          <Text style={styles.emptySub}>Contact your ad getter for an assignment.</Text>
+          <Text style={styles.emptySub}>Contact your business development executive for an assignment.</Text>
         </View>
       )}
 
