@@ -8,14 +8,19 @@ import { BASE_URL } from "../config";
 // needs a solid white patch to stay scannable.
 export function CustomerQrPanel({
   customerId,
+  screenId,
   businessName,
   coords,
 }: {
   customerId: number;
+  screenId: number;
   businessName?: string | null;
   coords: { lat: number; lng: number } | null;
 }) {
-  const profileUrl = `${BASE_URL}/api/qr/customer/${customerId}`;
+  // ?s= identifies which screen the person scanned from. Without it every
+  // scan is attributable to an advertiser but not to a location, which is
+  // what makes "is this spot working?" answerable.
+  const profileUrl = `${BASE_URL}/api/qr/customer/${customerId}?s=${screenId}`;
 
   return (
     <View style={styles.wrap} pointerEvents="none">
