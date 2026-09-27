@@ -3,8 +3,14 @@
 // Only BASE_URL changes between environments.
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Production API host. Change this if you point the app at a different server. */
-export const BASE_URL = "https://targettedpromotions.com";
+/**
+ * Production API host. Change this if you point the app at a different server.
+ *
+ * targettedpromotions.com still serves the same backend and must stay live
+ * until every box has taken the OTA carrying this value — a TV that was off
+ * when it shipped still has the old host compiled in, and will keep calling it.
+ */
+export const BASE_URL = "https://adwalk.in";
 export const API_URL = `${BASE_URL}/api`;
 
 /** Playback cadence — must match the web player so play-logs/billing line up. */
