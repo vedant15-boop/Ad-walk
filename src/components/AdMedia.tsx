@@ -14,7 +14,12 @@ import { mediaUri, isVideo } from "../config";
 // ─────────────────────────────────────────────────────────────────────────
 
 function AdVideo({ uri }: { uri: string }) {
-  const player = useVideoPlayer(uri, (p) => {
+  // useCaching writes played video to disk (LRU, 1 GB by default) so a clip
+  // keeps playing after the connection drops. expo-video defaults it to false,
+  // which meant any video ad went black the moment a box lost signal.
+  // A fresh object each render is fine: useVideoPlayer keys the player on
+  // JSON.stringify(source), not object identity.
+  const player = useVideoPlayer({ uri, useCaching: true }, (p) => {
     p.loop = true; // loop within the 12s slot if the clip is shorter
     p.muted = true; // public screens play silently
     p.play();

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { View, Text, StyleSheet, BackHandler } from "react-native";
 import { useKeepAwake } from "expo-keep-awake";
 import * as Location from "expo-location";
+import { Image } from "expo-image";
 import {
   getSlots,
   recordPlay,
@@ -21,6 +22,8 @@ import {
   DEMO_JUMP_ALLOWLIST_IDS,
   DEMO_FAST_SLOT_SECONDS,
   DEMO_FAST_SLOT_ALLOWLIST_IDS,
+  mediaUri,
+  isVideo,
 } from "../config";
 import { AdMedia } from "../components/AdMedia";
 import { FocusButton } from "../components/FocusButton";
@@ -78,6 +81,37 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
     });
   }, [screen.id]);
 
+  // ── Put every image in the rotation on disk up front ────────────────────
+  //
+  // Without this an image is only cached once it has actually been shown, so a
+  // freshly installed box needed a full 30-slot loop (~6 min) online before it
+  // could survive losing signal — and any slot it hadn't reached yet went blank.
+  // Prefetching downloads the whole rotation the moment the slot list arrives.
+  //
+  // Disk only, deliberately: "memory-disk" would decode every image into a
+  // bitmap at once, and a single 4K PNG is ~33 MB decoded — enough to push a
+  // low-RAM TV box over. Display still uses memory-disk and reads from disk.
+  //
+  // Videos aren't prefetched here; expo-video has no prefetch API. They cache
+  // as they play (useCaching in AdMedia), so they need one pass online.
+  const cachedUrlsRef = useRef(new Set<string>());
+  const inFlightUrlsRef = useRef(new Set<string>());
+  const prefetchImages = useCallback((list: Slot[]) => {
+    for (const s of list) {
+      if (!s.adMediaUrl || isVideo(s.adMediaType, s.adMediaUrl)) continue;
+      const uri = mediaUri(s.adMediaUrl);
+      if (!uri || cachedUrlsRef.current.has(uri) || inFlightUrlsRef.current.has(uri)) continue;
+      inFlightUrlsRef.current.add(uri);
+      // One call per URL: a batched prefetch resolves false if any single image
+      // fails, without saying which — so a partial failure would either mark
+      // everything done or nothing. Per-URL, a failure simply retries next poll.
+      Image.prefetch(uri, "disk")
+        .then((ok) => { if (ok) cachedUrlsRef.current.add(uri); })
+        .catch(() => {})
+        .finally(() => { inFlightUrlsRef.current.delete(uri); });
+    }
+  }, []);
+
   // ── Fetch + poll slots ──────────────────────────────────────────────────
   const refreshSlots = useCallback(async () => {
     try {
@@ -85,10 +119,11 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
       slotsRef.current = data;
       setSlots(data);
       saveSlots(screen.id, data); // persist for offline fallback
+      prefetchImages(data);
     } catch {
       // keep last-known slots on a network hiccup so playback continues
     }
-  }, [screen.id]);
+  }, [screen.id, prefetchImages]);
 
   useEffect(() => {
     refreshSlots();
