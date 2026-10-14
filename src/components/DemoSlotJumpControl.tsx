@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { FocusButton } from "./FocusButton";
-import { TOTAL_SLOTS } from "../config";
 
 // Demo-only: lets an allowlisted runner (see DEMO_JUMP_ALLOWLIST_IDS in
 // config.ts) jump PlayerScreen straight to a chosen slot instead of waiting
@@ -9,9 +8,11 @@ import { TOTAL_SLOTS } from "../config";
 // way for the rest of a demo.
 export function DemoSlotJumpControl({
   currentSlotNum,
+  totalSlots,
   onJump,
 }: {
   currentSlotNum: number;
+  totalSlots: number;
   onJump: (target: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -36,7 +37,7 @@ export function DemoSlotJumpControl({
       {expanded && (
         <View style={styles.card}>
           <Text style={styles.label} numberOfLines={1}>
-            Jump to slot {pending}/{TOTAL_SLOTS}
+            Jump to slot {pending}/{totalSlots}
           </Text>
           <View style={styles.row}>
             <FocusButton
@@ -49,7 +50,7 @@ export function DemoSlotJumpControl({
               label="+"
               variant="ghost"
               style={styles.stepBtn}
-              onPress={() => setPending((p) => Math.min(TOTAL_SLOTS, p + 1))}
+              onPress={() => setPending((p) => Math.min(totalSlots, p + 1))}
             />
             <FocusButton
               label="Jump"

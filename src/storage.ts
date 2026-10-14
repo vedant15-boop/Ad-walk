@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { AuthUser, Screen } from "./types";
+import type { AuthUser, Screen, PlaybackConfig } from "./types";
 
 // Token + user persist across reboots so the TV resumes broadcasting
 // after a power cut without anyone re-typing credentials.
@@ -53,6 +53,29 @@ export async function saveOrientation(value: DisplayOrientation): Promise<void> 
     await AsyncStorage.setItem(ORIENTATION_KEY, value);
   } catch {
     // best-effort — the in-memory setting still applies for this session
+  }
+}
+
+// ── Playback config (slot duration + count) ────────────────────────────────
+// Cached so a box that loses signal keeps the admin's chosen rotation rather
+// than reverting to the built-in default — which would mean playing a
+// different duration from the one it is billed at.
+const PLAYBACK_KEY = "adwalk_playback_config";
+
+export async function savePlaybackConfig(config: PlaybackConfig): Promise<void> {
+  try {
+    await AsyncStorage.setItem(PLAYBACK_KEY, JSON.stringify(config));
+  } catch {
+    // best-effort
+  }
+}
+
+export async function loadPlaybackConfig(): Promise<PlaybackConfig | null> {
+  try {
+    const raw = await AsyncStorage.getItem(PLAYBACK_KEY);
+    return raw ? (JSON.parse(raw) as PlaybackConfig) : null;
+  } catch {
+    return null;
   }
 }
 

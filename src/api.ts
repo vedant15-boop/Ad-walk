@@ -1,5 +1,5 @@
 import { API_URL } from "./config";
-import type { AuthUser, Screen, Slot } from "./types";
+import type { AuthUser, Screen, Slot, PlaybackConfig } from "./types";
 
 // Single auth token held in memory for the session; persisted separately.
 let authToken: string | null = null;
@@ -75,6 +75,10 @@ export async function getSlots(screenId: number): Promise<Slot[]> {
 // Mirrors the web player's "Sync" button: marks the screen as recently
 // synced (visible on the admin dashboard) and confirms it's reachable.
 // The caller should follow this with getSlots() to pull the full playlist.
+export async function getPlaybackConfig(): Promise<PlaybackConfig> {
+  return request<PlaybackConfig>("/playback-config");
+}
+
 export async function syncScreen(screenId: number): Promise<void> {
   await request(`/screens/${screenId}/sync`, { method: "POST" });
 }

@@ -13,9 +13,14 @@
 export const BASE_URL = "https://adwalk.in";
 export const API_URL = `${BASE_URL}/api`;
 
-/** Playback cadence — must match the web player so play-logs/billing line up. */
-export const SLOT_DURATION = 12; // seconds each slot is shown
-export const TOTAL_SLOTS = 30; // slots cycle 1 → 30 → 1
+/**
+ * Playback cadence fallbacks. The real values come from the server
+ * (/playback-config), set by the admin, and are cached on the device for
+ * offline use. These apply only to a box that has never reached the server.
+ * Duration × slots always equals the fixed 360 s cycle.
+ */
+export const DEFAULT_SLOT_DURATION = 10; // seconds each slot is shown
+export const DEFAULT_TOTAL_SLOTS = 36; // slots cycle 1 → 36 → 1
 
 /** Background timers. */
 export const HEARTBEAT_MS = 30_000; // session keep-alive
@@ -39,7 +44,7 @@ export const DEMO_JUMP_ALLOWLIST_IDS: number[] = [45]; // demo runner only
 
 /**
  * Demo-only: AuthUser.id values that play each slot for
- * DEMO_FAST_SLOT_SECONDS instead of the real SLOT_DURATION. Scoped to a
+ * DEMO_FAST_SLOT_SECONDS instead of the configured slot duration. Scoped to a
  * dedicated demo runner account — never a real deployment.
  */
 export const DEMO_FAST_SLOT_SECONDS = 4;

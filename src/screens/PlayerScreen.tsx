@@ -5,16 +5,17 @@ import * as Location from "expo-location";
 import { Image } from "expo-image";
 import {
   getSlots,
+  getPlaybackConfig,
   recordPlay,
   recordPlaysBatch,
   startSession,
   heartbeat,
   endSession,
 } from "../api";
-import { saveCounts, loadCounts, saveSlots, loadSlots, queuePlay, flushQueuedPlays } from "../storage";
+import { saveCounts, loadCounts, saveSlots, loadSlots, queuePlay, flushQueuedPlays, savePlaybackConfig, loadPlaybackConfig } from "../storage";
 import {
-  SLOT_DURATION,
-  TOTAL_SLOTS,
+  DEFAULT_SLOT_DURATION,
+  DEFAULT_TOTAL_SLOTS,
   HEARTBEAT_MS,
   SLOTS_REFRESH_MS,
   SHOW_QR_PANEL,
@@ -29,7 +30,7 @@ import { AdMedia } from "../components/AdMedia";
 import { FocusButton } from "../components/FocusButton";
 import { CustomerQrPanel } from "../components/CustomerQrPanel";
 import { DemoSlotJumpControl } from "../components/DemoSlotJumpControl";
-import type { AuthUser, Screen, Slot } from "../types";
+import type { AuthUser, Screen, Slot, PlaybackConfig } from "../types";
 
 function dateKey() {
   const d = new Date();
@@ -40,9 +41,32 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
   useKeepAwake(); // never let the TV sleep while broadcasting
 
   const canJumpSlots = DEMO_JUMP_ALLOWLIST_IDS.includes(user.id);
-  const effectiveSlotDuration = DEMO_FAST_SLOT_ALLOWLIST_IDS.includes(user.id)
-    ? DEMO_FAST_SLOT_SECONDS
-    : SLOT_DURATION;
+  const isDemoFast = DEMO_FAST_SLOT_ALLOWLIST_IDS.includes(user.id);
+
+  // ── Rotation shape, set by the admin ────────────────────────────────────
+  // Held in refs as well as state: the playback interval is created once and
+  // reads these on every tick, so a change made in the admin panel takes
+  // effect at the next slot boundary without restarting the loop.
+  const [playback, setPlayback] = useState<PlaybackConfig>({
+    adDurationSeconds: DEFAULT_SLOT_DURATION,
+    slotsPerCycle: DEFAULT_TOTAL_SLOTS,
+  });
+  const slotDurationRef = useRef(isDemoFast ? DEMO_FAST_SLOT_SECONDS : DEFAULT_SLOT_DURATION);
+  const totalSlotsRef = useRef(DEFAULT_TOTAL_SLOTS);
+  const applyPlayback = useCallback((config: PlaybackConfig) => {
+    // Reject anything malformed rather than break the rotation; the server
+    // also rejects plays longer than 120 s, so don't play one.
+    const d = config?.adDurationSeconds;
+    const n = config?.slotsPerCycle;
+    if (!Number.isInteger(d) || !Number.isInteger(n) || d < 1 || d > 120 || n < 1) return;
+    slotDurationRef.current = isDemoFast ? DEMO_FAST_SLOT_SECONDS : d;
+    totalSlotsRef.current = n;
+    setPlayback({ adDurationSeconds: d, slotsPerCycle: n });
+  }, [isDemoFast]);
+
+  useEffect(() => {
+    loadPlaybackConfig().then((cached) => { if (cached) applyPlayback(cached); });
+  }, [applyPlayback]);
 
   const [slots, setSlots] = useState<Slot[]>([]);
   const [currentSlotNum, setCurrentSlotNum] = useState(1);
@@ -114,6 +138,15 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
 
   // ── Fetch + poll slots ──────────────────────────────────────────────────
   const refreshSlots = useCallback(async () => {
+    // Separate try: an older server without /playback-config must not stop
+    // the slot list from refreshing.
+    try {
+      const config = await getPlaybackConfig();
+      applyPlayback(config);
+      savePlaybackConfig(config);
+    } catch {
+      // keep the cached or default rotation
+    }
     try {
       const data = await getSlots(screen.id);
       slotsRef.current = data;
@@ -123,7 +156,7 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
     } catch {
       // keep last-known slots on a network hiccup so playback continues
     }
-  }, [screen.id, prefetchImages]);
+  }, [screen.id, prefetchImages, applyPlayback]);
 
   useEffect(() => {
     refreshSlots();
@@ -185,14 +218,15 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
     };
   }, [screen.id]);
 
-  // ── Playback loop: advance every SLOT_DURATION, log the ad that played ───
+  // ── Playback loop: advance every slot duration, log the ad that played ──
   useEffect(() => {
     slotStartRef.current = Date.now();
 
     const tick = setInterval(() => {
       const elapsed = (Date.now() - slotStartRef.current) / 1000;
-      setProgressPercent(Math.min(100, (elapsed / effectiveSlotDuration) * 100));
-      if (elapsed < effectiveSlotDuration) return;
+      const slotDuration = slotDurationRef.current;
+      setProgressPercent(Math.min(100, (elapsed / slotDuration) * 100));
+      if (elapsed < slotDuration) return;
 
       const playing = slotsRef.current.find((s) => s.slotNumber === currentSlotRef.current) ?? null;
       if (playing) {
@@ -213,7 +247,7 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
           adId: playing.adId,
           slotNumber: playing.slotNumber,
           playedAt,
-          durationSeconds: effectiveSlotDuration,
+          durationSeconds: slotDuration,
         }).catch(() => {
           // Offline or request failed — queue it instead of losing it.
           // Flushed later via the manual Sync button.
@@ -222,12 +256,14 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
             adId: playing.adId,
             slotNumber: playing.slotNumber,
             playedAt,
-            durationSeconds: effectiveSlotDuration,
+            durationSeconds: slotDuration,
           });
         });
       }
 
-      const nextSlot = (currentSlotRef.current % TOTAL_SLOTS) + 1;
+      // Explicit wrap, not %: if the admin shrinks the cycle while this box is
+      // past the new last slot, % would land somewhere arbitrary.
+      const nextSlot = currentSlotRef.current >= totalSlotsRef.current ? 1 : currentSlotRef.current + 1;
       currentSlotRef.current = nextSlot;
       setCurrentSlotNum(nextSlot);
       slotStartRef.current = Date.now();
@@ -263,7 +299,7 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
   // No play is logged for the slot jumped away from — it didn't complete
   // its full dwell, so logging a normal-duration play for it would be a
   // false billing record. The slot jumped into logs normally once the tick
-  // above naturally reaches SLOT_DURATION from the reset clock.
+  // above naturally reaches the slot duration from the reset clock.
   const jumpToSlot = useCallback((target: number) => {
     currentSlotRef.current = target;
     setCurrentSlotNum(target);
@@ -315,7 +351,7 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
         )}
 
         {canJumpSlots && (
-          <DemoSlotJumpControl currentSlotNum={currentSlotNum} onJump={jumpToSlot} />
+          <DemoSlotJumpControl currentSlotNum={currentSlotNum} totalSlots={playback.slotsPerCycle} onJump={jumpToSlot} />
         )}
       </View>
 
@@ -330,7 +366,7 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
           {screen.name} · {screen.serialNumber}
         </Text>
         <Text style={styles.statusText}>
-          Slot {currentSlotNum}/{TOTAL_SLOTS} · {hasAd ? "LIVE" : "FILLER"} · {sessionTotal} this session · {todayCount} today
+          Slot {currentSlotNum}/{playback.slotsPerCycle} · {hasAd ? "LIVE" : "FILLER"} · {sessionTotal} this session · {todayCount} today
           {coords ? `  ·  ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}` : ""}
         </Text>
       </View>

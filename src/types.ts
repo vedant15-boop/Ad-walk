@@ -32,3 +32,9 @@ export interface Slot {
   customerCity: string | null;
   customerState: string | null;
 }
+
+/** How the rotation is divided. Set by the admin; slots × duration = cycle. */
+export interface PlaybackConfig {
+  adDurationSeconds: number;
+  slotsPerCycle: number;
+}
