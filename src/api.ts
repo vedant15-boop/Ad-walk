@@ -75,8 +75,9 @@ export async function getSlots(screenId: number): Promise<Slot[]> {
 // Mirrors the web player's "Sync" button: marks the screen as recently
 // synced (visible on the admin dashboard) and confirms it's reachable.
 // The caller should follow this with getSlots() to pull the full playlist.
-export async function getPlaybackConfig(): Promise<PlaybackConfig> {
-  return request<PlaybackConfig>("/playback-config");
+/** This screen's ad duration, slot count and broadcast hours. */
+export async function getPlaybackConfig(screenId: number): Promise<PlaybackConfig> {
+  return request<PlaybackConfig>(`/playback-config?screenId=${screenId}`);
 }
 
 export async function syncScreen(screenId: number): Promise<void> {

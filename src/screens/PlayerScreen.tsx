@@ -27,6 +27,7 @@ import {
   isVideo,
 } from "../config";
 import { AdMedia } from "../components/AdMedia";
+import { isWithinHours, minutesOfDay } from "../screenHours";
 import { FocusButton } from "../components/FocusButton";
 import { CustomerQrPanel } from "../components/CustomerQrPanel";
 import { DemoSlotJumpControl } from "../components/DemoSlotJumpControl";
@@ -48,11 +49,16 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
   // reads these on every tick, so a change made in the admin panel takes
   // effect at the next slot boundary without restarting the loop.
   const [playback, setPlayback] = useState<PlaybackConfig>({
-    adDurationSeconds: DEFAULT_SLOT_DURATION,
-    slotsPerCycle: DEFAULT_TOTAL_SLOTS,
+    adDurationSeconds: screen.adDurationSeconds ?? DEFAULT_SLOT_DURATION,
+    slotsPerCycle: screen.totalSlots || DEFAULT_TOTAL_SLOTS,
+    activeStartTime: screen.activeStartTime,
+    activeEndTime: screen.activeEndTime,
   });
-  const slotDurationRef = useRef(isDemoFast ? DEMO_FAST_SLOT_SECONDS : DEFAULT_SLOT_DURATION);
-  const totalSlotsRef = useRef(DEFAULT_TOTAL_SLOTS);
+  const slotDurationRef = useRef(isDemoFast ? DEMO_FAST_SLOT_SECONDS : (screen.adDurationSeconds ?? DEFAULT_SLOT_DURATION));
+  const totalSlotsRef = useRef(screen.totalSlots || DEFAULT_TOTAL_SLOTS);
+  // Broadcast hours. Unknown only if the server predates them, in which case
+  // the box airs all day as it always did.
+  const hoursRef = useRef<{ start?: string; end?: string }>({ start: screen.activeStartTime, end: screen.activeEndTime });
   const applyPlayback = useCallback((config: PlaybackConfig) => {
     // Reject anything malformed rather than break the rotation; the server
     // also rejects plays longer than 120 s, so don't play one.
@@ -61,12 +67,24 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
     if (!Number.isInteger(d) || !Number.isInteger(n) || d < 1 || d > 120 || n < 1) return;
     slotDurationRef.current = isDemoFast ? DEMO_FAST_SLOT_SECONDS : d;
     totalSlotsRef.current = n;
-    setPlayback({ adDurationSeconds: d, slotsPerCycle: n });
+    const start = minutesOfDay(config.activeStartTime) !== null ? config.activeStartTime : hoursRef.current.start;
+    const end = minutesOfDay(config.activeEndTime) !== null ? config.activeEndTime : hoursRef.current.end;
+    hoursRef.current = { start, end };
+    setPlayback({ adDurationSeconds: d, slotsPerCycle: n, activeStartTime: start, activeEndTime: end });
   }, [isDemoFast]);
 
   useEffect(() => {
-    loadPlaybackConfig().then((cached) => { if (cached) applyPlayback(cached); });
-  }, [applyPlayback]);
+    loadPlaybackConfig(screen.id).then((cached) => { if (cached) applyPlayback(cached); });
+  }, [applyPlayback, screen.id]);
+
+  // On air only inside the screen's hours. Evaluated on every tick of the
+  // playback loop below; this state just drives what's drawn.
+  const [onAir, setOnAir] = useState(true);
+  const isOnAir = useCallback((at: Date) => {
+    const { start, end } = hoursRef.current;
+    if (start === undefined && end === undefined) return true;
+    return isWithinHours(start, end, at);
+  }, []);
 
   const [slots, setSlots] = useState<Slot[]>([]);
   const [currentSlotNum, setCurrentSlotNum] = useState(1);
@@ -141,9 +159,9 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
     // Separate try: an older server without /playback-config must not stop
     // the slot list from refreshing.
     try {
-      const config = await getPlaybackConfig();
+      const config = await getPlaybackConfig(screen.id);
       applyPlayback(config);
-      savePlaybackConfig(config);
+      savePlaybackConfig(screen.id, config);
     } catch {
       // keep the cached or default rotation
     }
@@ -222,7 +240,26 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
   useEffect(() => {
     slotStartRef.current = Date.now();
 
+    let wasOnAir = true;
     const tick = setInterval(() => {
+      // Outside broadcast hours nothing rotates and nothing is logged. A slot
+      // cut short by the end of the window isn't counted — it didn't finish.
+      const live = isOnAir(new Date());
+      if (live !== wasOnAir) setOnAir(live);
+      if (!live) {
+        wasOnAir = false;
+        slotStartRef.current = Date.now();
+        setProgressPercent(0);
+        return;
+      }
+      if (!wasOnAir) {
+        // Back on air: start a fresh cycle rather than resuming mid-rotation.
+        wasOnAir = true;
+        currentSlotRef.current = 1;
+        setCurrentSlotNum(1);
+        slotStartRef.current = Date.now();
+      }
+
       const elapsed = (Date.now() - slotStartRef.current) / 1000;
       const slotDuration = slotDurationRef.current;
       setProgressPercent(Math.min(100, (elapsed / slotDuration) * 100));
@@ -332,7 +369,15 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
     <View style={styles.root}>
       {/* Ad / filler — fills the available panel above the progress strip, fit to any resolution */}
       <View style={styles.adArea}>
-        {hasAd ? (
+        {!onAir ? (
+          <View style={styles.filler}>
+            <Text style={styles.offAirLabel}>OFF AIR</Text>
+            <Text style={styles.fillerBrand}>AdWalk</Text>
+            <Text style={styles.fillerSub}>
+              ADS RUN {playback.activeStartTime}–{playback.activeEndTime} IST
+            </Text>
+          </View>
+        ) : hasAd ? (
           <AdMedia url={currentSlot!.adMediaUrl} mediaType={currentSlot!.adMediaType} />
         ) : (
           <View style={styles.filler}>
@@ -341,7 +386,7 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
           </View>
         )}
 
-        {SHOW_QR_PANEL && hasAd && currentSlot!.customerId != null && (
+        {SHOW_QR_PANEL && onAir && hasAd && currentSlot!.customerId != null && (
           <CustomerQrPanel
             customerId={currentSlot!.customerId}
             screenId={screen.id}
@@ -382,6 +427,7 @@ const styles = StyleSheet.create({
   filler: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f97316" },
   fillerBrand: { color: "#000", fontSize: 80, fontWeight: "900", letterSpacing: -2 },
   fillerSub: { color: "rgba(0,0,0,0.5)", fontSize: 14, letterSpacing: 6, marginTop: 8, fontWeight: "700" },
+  offAirLabel: { color: "rgba(0,0,0,0.45)", fontSize: 16, letterSpacing: 8, marginBottom: 8, fontWeight: "800" },
   kicked: { flex: 1, backgroundColor: "#dc2626", alignItems: "center", justifyContent: "center", padding: 40, gap: 16 },
   kickedTitle: { color: "#fff", fontSize: 32, fontWeight: "900" },
   kickedBody: { color: "rgba(255,255,255,0.85)", fontSize: 16, textAlign: "center", maxWidth: 420 },

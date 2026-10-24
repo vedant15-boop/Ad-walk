@@ -17,6 +17,9 @@ export interface Screen {
   usedSlots: number;
   totalSlots: number;
   lastSyncAt?: string | null;
+  activeStartTime?: string;
+  activeEndTime?: string;
+  adDurationSeconds?: number;
 }
 
 export interface Slot {
@@ -37,4 +40,7 @@ export interface Slot {
 export interface PlaybackConfig {
   adDurationSeconds: number;
   slotsPerCycle: number;
+  /** Broadcast hours, "HH:MM" India time. Absent from servers that predate them. */
+  activeStartTime?: string;
+  activeEndTime?: string;
 }

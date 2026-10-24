@@ -56,23 +56,26 @@ export async function saveOrientation(value: DisplayOrientation): Promise<void> 
   }
 }
 
-// ── Playback config (slot duration + count) ────────────────────────────────
-// Cached so a box that loses signal keeps the admin's chosen rotation rather
-// than reverting to the built-in default — which would mean playing a
-// different duration from the one it is billed at.
-const PLAYBACK_KEY = "adwalk_playback_config";
+// ── Playback config (duration, slot count, broadcast hours) ────────────────
+// Per screen, cached so a box that loses signal keeps that screen's rotation
+// and hours rather than reverting to built-in defaults — which would mean
+// playing a different duration from the one it is billed at, or airing
+// outside its hours.
+function playbackKey(screenId: number) {
+  return `adwalk_playback_config_${screenId}`;
+}
 
-export async function savePlaybackConfig(config: PlaybackConfig): Promise<void> {
+export async function savePlaybackConfig(screenId: number, config: PlaybackConfig): Promise<void> {
   try {
-    await AsyncStorage.setItem(PLAYBACK_KEY, JSON.stringify(config));
+    await AsyncStorage.setItem(playbackKey(screenId), JSON.stringify(config));
   } catch {
     // best-effort
   }
 }
 
-export async function loadPlaybackConfig(): Promise<PlaybackConfig | null> {
+export async function loadPlaybackConfig(screenId: number): Promise<PlaybackConfig | null> {
   try {
-    const raw = await AsyncStorage.getItem(PLAYBACK_KEY);
+    const raw = await AsyncStorage.getItem(playbackKey(screenId));
     return raw ? (JSON.parse(raw) as PlaybackConfig) : null;
   } catch {
     return null;
