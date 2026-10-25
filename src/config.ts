@@ -25,7 +25,6 @@ export const DEFAULT_TOTAL_SLOTS = 36; // slots cycle 1 → 36 → 1
 /** Background timers. */
 export const HEARTBEAT_MS = 30_000; // session keep-alive
 export const SLOTS_REFRESH_MS = 30_000; // re-fetch slots to pick up newly approved ads
-export const LOCATION_REPORT_MS = 30 * 60_000; // push GPS to server every 30 min
 // Drain the offline play backlog while broadcasting. Previously this only
 // happened on the screen-select screen, so a TV left playing — the normal
 // case — never sent its queued plays at all.
