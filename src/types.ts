@@ -43,4 +43,16 @@ export interface PlaybackConfig {
   /** Broadcast hours, "HH:MM" India time. Absent from servers that predate them. */
   activeStartTime?: string;
   activeEndTime?: string;
+  /** Shown outside broadcast hours; null or absent for the plain off-air card. */
+  fillerMediaUrl?: string | null;
+  fillerMediaType?: string | null;
+}
+
+/** Where the rotation is, sent with each heartbeat for the screen preview. */
+export interface NowPlayingReport {
+  slotNumber: number;
+  slotStartedAt: string;
+  onAir: boolean;
+  slotsPerCycle: number;
+  adDurationSeconds: number;
 }

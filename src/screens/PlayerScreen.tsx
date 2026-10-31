@@ -70,7 +70,20 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
     const start = minutesOfDay(config.activeStartTime) !== null ? config.activeStartTime : hoursRef.current.start;
     const end = minutesOfDay(config.activeEndTime) !== null ? config.activeEndTime : hoursRef.current.end;
     hoursRef.current = { start, end };
-    setPlayback({ adDurationSeconds: d, slotsPerCycle: n, activeStartTime: start, activeEndTime: end });
+    setPlayback({
+      adDurationSeconds: d,
+      slotsPerCycle: n,
+      activeStartTime: start,
+      activeEndTime: end,
+      fillerMediaUrl: config.fillerMediaUrl ?? null,
+      fillerMediaType: config.fillerMediaType ?? null,
+    });
+    // Keep the filler image on disk for off-air hours without signal. A filler
+    // video caches as it plays, like ad videos.
+    const filler = mediaUri(config.fillerMediaUrl);
+    if (filler && !isVideo(config.fillerMediaType, config.fillerMediaUrl)) {
+      Image.prefetch(filler, "disk").catch(() => {});
+    }
   }, [isDemoFast]);
 
   useEffect(() => {
@@ -80,6 +93,7 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
   // On air only inside the screen's hours. Evaluated on every tick of the
   // playback loop below; this state just drives what's drawn.
   const [onAir, setOnAir] = useState(true);
+  const onAirRef = useRef(true);
   const isOnAir = useCallback((at: Date) => {
     const { start, end } = hoursRef.current;
     if (start === undefined && end === undefined) return true;
@@ -195,7 +209,13 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
       const token = sessionTokenRef.current;
       if (!token) return;
       try {
-        const { valid } = await heartbeat(screen.id, token);
+        const { valid } = await heartbeat(screen.id, token, {
+          slotNumber: currentSlotRef.current,
+          slotStartedAt: new Date(slotStartRef.current).toISOString(),
+          onAir: onAirRef.current,
+          slotsPerCycle: totalSlotsRef.current,
+          adDurationSeconds: slotDurationRef.current,
+        });
         if (!valid) setKicked(true);
       } catch {
         // network blip — keep playing
@@ -246,6 +266,7 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
       // cut short by the end of the window isn't counted — it didn't finish.
       const live = isOnAir(new Date());
       if (live !== wasOnAir) setOnAir(live);
+      onAirRef.current = live;
       if (!live) {
         wasOnAir = false;
         slotStartRef.current = Date.now();
@@ -303,7 +324,14 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
       const nextSlot = currentSlotRef.current >= totalSlotsRef.current ? 1 : currentSlotRef.current + 1;
       currentSlotRef.current = nextSlot;
       setCurrentSlotNum(nextSlot);
-      slotStartRef.current = Date.now();
+      // The next slot starts when this one was due to end, not when the tick
+      // noticed: otherwise each slot runs up to 250 ms long, and the screen
+      // preview, which counts slots forward from the last report, falls
+      // further behind the longer a box is offline. If the loop stalled for a
+      // whole slot (app suspended), restart the clock rather than racing
+      // through the missed slots.
+      const due = slotStartRef.current + slotDuration * 1000;
+      slotStartRef.current = Date.now() - due < slotDuration * 1000 ? due : Date.now();
       setProgressPercent(0);
     }, 250);
 
@@ -369,7 +397,9 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
     <View style={styles.root}>
       {/* Ad / filler — fills the available panel above the progress strip, fit to any resolution */}
       <View style={styles.adArea}>
-        {!onAir ? (
+        {!onAir && playback.fillerMediaUrl ? (
+          <AdMedia url={playback.fillerMediaUrl} mediaType={playback.fillerMediaType ?? null} />
+        ) : !onAir ? (
           <View style={styles.filler}>
             <Text style={styles.offAirLabel}>OFF AIR</Text>
             <Text style={styles.fillerBrand}>AdWalk</Text>

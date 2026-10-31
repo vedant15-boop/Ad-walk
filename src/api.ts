@@ -1,5 +1,5 @@
 import { API_URL } from "./config";
-import type { AuthUser, Screen, Slot, PlaybackConfig } from "./types";
+import type { AuthUser, Screen, Slot, PlaybackConfig, NowPlayingReport } from "./types";
 
 // Single auth token held in memory for the session; persisted separately.
 let authToken: string | null = null;
@@ -114,10 +114,14 @@ export async function startSession(screenId: number): Promise<{ sessionToken: st
   });
 }
 
-export async function heartbeat(screenId: number, sessionToken: string): Promise<{ valid: boolean }> {
+export async function heartbeat(
+  screenId: number,
+  sessionToken: string,
+  nowPlaying?: NowPlayingReport,
+): Promise<{ valid: boolean }> {
   return request("/runner-sessions/heartbeat", {
     method: "POST",
-    body: JSON.stringify({ screenId, sessionToken }),
+    body: JSON.stringify({ screenId, sessionToken, nowPlaying }),
   });
 }
 
