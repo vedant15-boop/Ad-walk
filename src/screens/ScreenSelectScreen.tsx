@@ -135,12 +135,15 @@ export function ScreenSelectScreen({
 
       {screens && screens.length > 0 && (
         <ScrollView contentContainerStyle={styles.list}>
+          {/* A screen with nothing booked still runs: every slot shows the
+              AdWalk card until an ad is booked into it. */}
           {screens.map((s) => (
             <FocusButton
               key={s.id}
-              label={`${s.name}   ·   ${s.serialNumber}   ·   ${s.usedSlots} ad${s.usedSlots === 1 ? "" : "s"}`}
+              label={`${s.name}   ·   ${s.serialNumber}   ·   ${
+                s.usedSlots === 0 ? "no ads · AdWalk card" : `${s.usedSlots} ad${s.usedSlots === 1 ? "" : "s"}`
+              }`}
               onPress={() => onSelect(s)}
-              disabled={s.usedSlots === 0}
               style={styles.screenBtn}
             />
           ))}
