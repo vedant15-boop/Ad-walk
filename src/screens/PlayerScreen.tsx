@@ -397,7 +397,9 @@ export function PlayerScreen({ screen, user, onExit }: { screen: Screen; user: A
     <View style={styles.root}>
       {/* Ad / filler — fills the available panel above the progress strip, fit to any resolution */}
       <View style={styles.adArea}>
-        {!onAir && playback.fillerMediaUrl ? (
+        {/* The filler ad plays off air and in any empty slot during hours; a
+            booked ad always takes its slot. */}
+        {(!onAir || !hasAd) && playback.fillerMediaUrl ? (
           <AdMedia url={playback.fillerMediaUrl} mediaType={playback.fillerMediaType ?? null} />
         ) : !onAir ? (
           <View style={styles.filler}>
