@@ -31,6 +31,11 @@ function AdVideo({ uri }: { uri: string }) {
       player={player}
       contentFit="contain"
       nativeControls={false}
+      // A portrait-mounted panel is drawn by rotating the whole UI
+      // (RotatedStage). The default SurfaceView ignores that rotation, so
+      // video played sideways while images were upright; a TextureView turns
+      // with the rest of the screen.
+      surfaceType="textureView"
     />
   );
 }
